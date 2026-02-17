@@ -30,13 +30,13 @@ use orca_whirlpools_macros::wasm_expose;
 /// The exact input or output amount for the swap transaction.
 #[allow(clippy::too_many_arguments)]
 #[cfg_attr(feature = "wasm", wasm_expose)]
-pub fn swap_quote_by_input_token(
+pub fn swap_quote_by_input_token<const SIZE: usize>(
     token_in: u64,
     specified_token_a: bool,
     slippage_tolerance_bps: u16,
     whirlpool: WhirlpoolFacade,
     oracle: Option<OracleFacade>,
-    tick_arrays: TickArrays,
+    tick_sequence: &TickArraySequence<SIZE>,
     timestamp: u64,
     transfer_fee_a: Option<TransferFee>,
     transfer_fee_b: Option<TransferFee>,
@@ -48,8 +48,6 @@ pub fn swap_quote_by_input_token(
     };
     let token_in_after_fee =
         try_apply_transfer_fee(token_in.into(), transfer_fee_in.unwrap_or_default())?;
-
-    let tick_sequence = TickArraySequence::new(tick_arrays.into(), whirlpool.tick_spacing)?;
 
     let swap_result = compute_swap(
         token_in_after_fee.into(),
@@ -613,6 +611,12 @@ mod tests {
         .into()
     }
 
+    fn test_tick_sequence() -> TickArraySequence<6> {
+        let tick_arrays = test_tick_arrays();
+        let tick_arrays: [Option<TickArrayFacade>; 6] = tick_arrays.into();
+        TickArraySequence::new(tick_arrays, 2).unwrap()
+    }
+
     fn now() -> u64 {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -628,7 +632,7 @@ mod tests {
             1000,
             test_whirlpool(1 << 64, true),
             None,
-            test_tick_arrays(),
+            &test_tick_sequence(),
             now(),
             None,
             None,
@@ -648,7 +652,7 @@ mod tests {
             1000,
             test_whirlpool(1 << 64, false),
             None,
-            test_tick_arrays(),
+            &test_tick_sequence(),
             now(),
             None,
             None,
@@ -668,7 +672,7 @@ mod tests {
             1000,
             test_whirlpool(1 << 64, true),
             None,
-            test_tick_arrays(),
+            &test_tick_sequence(),
             now(),
             None,
             None,
@@ -688,7 +692,7 @@ mod tests {
             1000,
             test_whirlpool(1 << 64, false),
             None,
-            test_tick_arrays(),
+            &test_tick_sequence(),
             now(),
             None,
             None,
@@ -788,7 +792,7 @@ mod tests {
             0,
             test_whirlpool(1 << 64, false),
             None,
-            test_tick_arrays(),
+            &test_tick_sequence(),
             now(),
             None,
             None,
@@ -800,7 +804,7 @@ mod tests {
             0,
             test_whirlpool(1 << 64, false),
             None,
-            test_tick_arrays(),
+            &test_tick_sequence(),
             now(),
             None,
             None,
@@ -875,6 +879,12 @@ mod tests {
             ]
         }
 
+        fn test_empty_tick_sequence() -> TickArraySequence<6> {
+            let tick_arrays = test_empty_tick_arrays();
+            let tick_arrays: TickArrays = tick_arrays.into();
+            TickArraySequence::new(tick_arrays.into(), 64).unwrap()
+        }
+
         #[test]
         fn test_exact_in_a_to_b_simple() {
             let now = now();
@@ -884,7 +894,7 @@ mod tests {
                 1000,
                 test_whirlpool_with_adaptive_fee(tick_index_to_sqrt_price(0), 1_000_000),
                 Some(test_oracle(now, now, now, 0, 0, 0)),
-                test_empty_tick_arrays().into(), // full-range liquidity
+                &test_empty_tick_sequence(), // full-range liquidity
                 now,
                 None,
                 None,
@@ -906,7 +916,7 @@ mod tests {
                 1000,
                 test_whirlpool_with_adaptive_fee(tick_index_to_sqrt_price(0), 1_000_000),
                 Some(test_oracle(now, now - 600, now - 600, 100_000, 0, 100_000)),
-                test_empty_tick_arrays().into(), // full-range liquidity
+                &test_empty_tick_sequence(), // full-range liquidity
                 now,
                 None,
                 None,
@@ -936,7 +946,7 @@ mod tests {
                 1000,
                 test_whirlpool_with_adaptive_fee(tick_index_to_sqrt_price(0), 1_000_000 + 500_000),
                 Some(test_oracle(now, now, now, 0, 0, 0)),
-                tick_arrays.into(),
+                &test_empty_tick_sequence(),
                 now,
                 None,
                 None,
