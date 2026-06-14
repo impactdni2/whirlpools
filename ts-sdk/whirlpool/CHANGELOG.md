@@ -1,5 +1,97 @@
 # @orca-so/whirlpools
 
+## 8.0.0
+
+### Major Changes
+
+- [#1305](https://github.com/orca-so/whirlpools/pull/1305) [`9c2b830`](https://github.com/orca-so/whirlpools/commit/9c2b830d31f4910eb102a16f922c34e4c2bc6a3b) Thanks [@crnorthc](https://github.com/crnorthc)! - Replace the global `WHIRLPOOLS_CONFIG_ADDRESS` / `setWhirlpoolsConfig` / `DEFAULT_WHIRLPOOLS_CONFIG_ADDRESSES` API with a per-call `WhirlpoolDeployment` (mainnet / devnet / mainnet-immutable / custom). PDA helpers in `@orca-so/whirlpools-client` no longer take `whirlpoolsConfig` positionally — pass a `WhirlpoolDeployment` (or program id) instead, and SDK function arguments are bundled into `…Config` option objects.
+
+### Patch Changes
+
+- Updated dependencies [[`9c2b830`](https://github.com/orca-so/whirlpools/commit/9c2b830d31f4910eb102a16f922c34e4c2bc6a3b)]:
+  - @orca-so/whirlpools-client@7.0.0
+
+## 7.0.2
+
+### Patch Changes
+
+- [#1273](https://github.com/orca-so/whirlpools/pull/1273) [`357eed6`](https://github.com/orca-so/whirlpools/commit/357eed6f14a77357110e45855656ad8adb7ad18b) Thanks [@jshiohaha](https://github.com/jshiohaha)! - fix typo: Rage -> Range
+
+## 7.0.1
+
+### Patch Changes
+
+- [#1252](https://github.com/orca-so/whirlpools/pull/1252) [`505cbe0`](https://github.com/orca-so/whirlpools/commit/505cbe07ebadee7e3e130abc034b32c9b27248d7) Thanks [@jshiohaha](https://github.com/jshiohaha)! - replace create_associated_token_account with create_associated_token_account_idempotent in prepare_token_accounts_instructions
+
+## 7.0.0
+
+### Major Changes
+
+- [#1247](https://github.com/orca-so/whirlpools/pull/1247) [`0324ac8`](https://github.com/orca-so/whirlpools/commit/0324ac8f1658c201e73abace077f734a38b9dcb7) Thanks [@josh-orca](https://github.com/josh-orca)! - Refactors the increase-liquidity API in both TypeScript and Rust SDKs to use token maximum amounts. Both SDKs now require specifying `tokenMaxA` and `tokenMaxB` — the program adds the maximum liquidity achievable within those limits.
+
+  ## Breaking changes
+
+  ### TypeScript SDK (`@orca-so/whirlpools`)
+
+  The increase-liquidity and open-position functions now take `tokenMaxAmounts: { tokenMaxA, tokenMaxB }` instead of a param object with `liquidity`, `tokenA`, or `tokenB`. The return value no longer includes a `quote` — callers must compute quotes separately if needed.
+
+  ```ts
+  // Before
+  { liquidity: 10_000n }
+  { tokenA: 1_000_000n }
+  { tokenB: 1_000_000n }
+  // Returned: { quote, instructions, ... }
+
+  // After
+  { tokenMaxA: 1_000_000n, tokenMaxB: 1_000_000n }
+  // One-sided: { tokenMaxA: 1_000_000n, tokenMaxB: 0n } or { tokenMaxA: 0n, tokenMaxB: 1_000_000n }
+  // Returned: { instructions } (no quote)
+  ```
+
+  ### Rust SDK (`@orca-so/whirlpools-rust`)
+
+  `IncreaseLiquidityParam` has been removed and replaced with `IncreaseLiquidityTokenMaxAmounts`, a struct constructed via `IncreaseLiquidityTokenMaxAmounts::new(token_max_a, token_max_b)`. The increase-liquidity and open-position functions no longer return a quote.
+
+  ```rust
+  // Before
+  IncreaseLiquidityParam::Liquidity(amount)
+  IncreaseLiquidityParam::TokenA(amount)
+  IncreaseLiquidityParam::TokenB(amount)
+  // Returned: IncreaseLiquidityInstruction { quote, instructions, ... }
+
+  // After
+  IncreaseLiquidityTokenMaxAmounts::new(1_000_000, 1_000_000)
+  // One-sided: IncreaseLiquidityTokenMaxAmounts::new(1_000_000, 0) or ::new(0, 1_000_000)
+  // Returned: IncreaseLiquidityInstruction { instructions, additional_signers } (no quote)
+  ```
+
+- [#1243](https://github.com/orca-so/whirlpools/pull/1243) [`7290d86`](https://github.com/orca-so/whirlpools/commit/7290d869c004bb07671e160dc0b73fdae1ac5609) Thanks [@jshiohaha](https://github.com/jshiohaha)! - propagate withTokenMetadataExtension parameter to allow caller to pass metadata preferences, add new openPositionInstructionsWithTickBounds function, change getIncreaseLiquidityQuote visibility modifier
+
+### Minor Changes
+
+- [#1242](https://github.com/orca-so/whirlpools/pull/1242) [`022bd2a`](https://github.com/orca-so/whirlpools/commit/022bd2ae49a19a8ec143cd7998b6f436663eebac) Thanks [@wjthieme](https://github.com/wjthieme)! - Use increaseLiquidityByTokenAmounts as default.
+
+  BREAKING: increaseLiquidity now expects ByTokenAmounts params (tokenMaxA/B and
+  min/max sqrt price bounds) rather than the previous default liquidity-based
+  instruction.
+
+  @orca-so/whirlpools-sdk is still in major version zero so the breaking changes
+  are a minor update.
+
+  It avoids an intermediate liquidity calculation and is more natural for
+  callers to provide token amounts; the instruction derives the liquidity change
+  under price-deviation constraints.
+
+  Update callers to pass ByTokenAmountsParams (tokenMaxA/B plus minSqrtPrice
+  and maxSqrtPrice).
+
+- [#1250](https://github.com/orca-so/whirlpools/pull/1250) [`1d34846`](https://github.com/orca-so/whirlpools/commit/1d348463128ffca6d45fb5bd5a167007a11522f2) Thanks [@josh-orca](https://github.com/josh-orca)! - Update sqrt price math precision
+
+### Patch Changes
+
+- Updated dependencies [[`1d34846`](https://github.com/orca-so/whirlpools/commit/1d348463128ffca6d45fb5bd5a167007a11522f2)]:
+  - @orca-so/whirlpools-core@3.1.0
+
 ## 6.0.0
 
 ### Major Changes
