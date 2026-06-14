@@ -19,6 +19,7 @@ use orca_whirlpools_macros::wasm_expose;
 /// - `token_in`: The input token amount.
 /// - `specified_token_a`: If `true`, the input token is token A. Otherwise, it is token B.
 /// - `slippage_tolerance`: The slippage tolerance in basis points.
+/// - `sqrt_price_limit`: The price limit for the swap represented as a square root.
 /// - `whirlpool`: The whirlpool state.
 /// - `oracle`: The oracle data for the whirlpool.
 /// - `tick_arrays`: The tick arrays needed for the swap.
@@ -34,6 +35,7 @@ pub fn swap_quote_by_input_token<const SIZE: usize>(
     token_in: u64,
     specified_token_a: bool,
     slippage_tolerance_bps: u16,
+    sqrt_price_limit: Option<u128>,
     whirlpool: &WhirlpoolFacade,
     oracle: Option<OracleFacade>,
     tick_sequence: &TickArraySequence<SIZE>,
@@ -51,7 +53,7 @@ pub fn swap_quote_by_input_token<const SIZE: usize>(
 
     let swap_result = compute_swap(
         token_in_after_fee.into(),
-        0,
+        sqrt_price_limit.unwrap_or(0),
         whirlpool,
         tick_sequence,
         specified_token_a,
@@ -93,6 +95,7 @@ pub fn swap_quote_by_input_token<const SIZE: usize>(
 /// - `token_out`: The output token amount.
 /// - `specified_token_a`: If `true`, the output token is token A. Otherwise, it is token B.
 /// - `slippage_tolerance`: The slippage tolerance in basis points.
+/// - `sqrt_price_limit`: The price limit for the swap represented as a square root.
 /// - `whirlpool`: The whirlpool state.
 /// - `oracle`: The oracle data for the whirlpool.
 /// - `tick_arrays`: The tick arrays needed for the swap.
@@ -108,6 +111,7 @@ pub fn swap_quote_by_output_token(
     token_out: u64,
     specified_token_a: bool,
     slippage_tolerance_bps: u16,
+    sqrt_price_limit: Option<u128>,
     whirlpool: WhirlpoolFacade,
     oracle: Option<OracleFacade>,
     tick_arrays: TickArrays,
@@ -127,7 +131,7 @@ pub fn swap_quote_by_output_token(
 
     let swap_result = compute_swap(
         token_out_before_fee.into(),
-        0,
+        sqrt_price_limit.unwrap_or(0),
         &whirlpool,
         &tick_sequence,
         !specified_token_a,
@@ -630,6 +634,7 @@ mod tests {
             1000,
             true,
             1000,
+            None,
             &test_whirlpool(1 << 64, true),
             None,
             &test_tick_sequence(),
@@ -645,11 +650,29 @@ mod tests {
     }
 
     #[test]
+    fn test_exact_in_uses_sqrt_price_limit() {
+        let result = swap_quote_by_input_token(
+            1000,
+            true,
+            1000,
+            Some(1 << 64),
+            &test_whirlpool(1 << 64, true),
+            None,
+            &test_tick_sequence(),
+            now(),
+            None,
+            None,
+        );
+        assert_eq!(result, Err(INVALID_SQRT_PRICE_LIMIT_DIRECTION));
+    }
+
+    #[test]
     fn test_exact_in_a_to_b() {
         let result = swap_quote_by_input_token(
             1000,
             true,
             1000,
+            None,
             &test_whirlpool(1 << 64, false),
             None,
             &test_tick_sequence(),
@@ -670,6 +693,7 @@ mod tests {
             1000,
             false,
             1000,
+            None,
             &test_whirlpool(1 << 64, true),
             None,
             &test_tick_sequence(),
@@ -690,6 +714,7 @@ mod tests {
             1000,
             false,
             1000,
+            None,
             &test_whirlpool(1 << 64, false),
             None,
             &test_tick_sequence(),
@@ -710,6 +735,7 @@ mod tests {
             1000,
             false,
             1000,
+            None,
             test_whirlpool(1 << 64, true),
             None,
             test_tick_arrays(),
@@ -730,6 +756,7 @@ mod tests {
             1000,
             false,
             1000,
+            None,
             test_whirlpool(1 << 64, false),
             None,
             test_tick_arrays(),
@@ -750,6 +777,7 @@ mod tests {
             1000,
             true,
             1000,
+            None,
             test_whirlpool(1 << 64, true),
             None,
             test_tick_arrays(),
@@ -770,6 +798,7 @@ mod tests {
             1000,
             true,
             1000,
+            None,
             test_whirlpool(1 << 64, false),
             None,
             test_tick_arrays(),
@@ -790,6 +819,7 @@ mod tests {
             3428,
             true,
             0,
+            None,
             &test_whirlpool(1 << 64, false),
             None,
             &test_tick_sequence(),
@@ -802,6 +832,7 @@ mod tests {
             3429,
             true,
             0,
+            None,
             &test_whirlpool(1 << 64, false),
             None,
             &test_tick_sequence(),
@@ -892,6 +923,7 @@ mod tests {
                 150_000,
                 true,
                 1000,
+                None,
                 &test_whirlpool_with_adaptive_fee(tick_index_to_sqrt_price(0), 1_000_000),
                 Some(test_oracle(now, now, now, 0, 0, 0)),
                 &test_empty_tick_sequence(), // full-range liquidity
@@ -914,6 +946,7 @@ mod tests {
                 150_000,
                 true,
                 1000,
+                None,
                 &test_whirlpool_with_adaptive_fee(tick_index_to_sqrt_price(0), 1_000_000),
                 Some(test_oracle(now, now - 600, now - 600, 100_000, 0, 100_000)),
                 &test_empty_tick_sequence(), // full-range liquidity
@@ -944,6 +977,7 @@ mod tests {
                 150_000,
                 false,
                 1000,
+                None,
                 &test_whirlpool_with_adaptive_fee(tick_index_to_sqrt_price(0), 1_000_000 + 500_000),
                 Some(test_oracle(now, now, now, 0, 0, 0)),
                 &test_empty_tick_sequence(),

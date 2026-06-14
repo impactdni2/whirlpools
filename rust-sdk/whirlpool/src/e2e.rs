@@ -373,6 +373,7 @@ impl TestContext {
             SwapType::ExactIn,
             SwapConfig {
                 slippage_tolerance_bps: None,
+                sqrt_price_limit: None,
                 signer: Some(self.ctx.signer.pubkey()),
                 whirlpool_deployment: Some(self.whirlpool_deployment),
             },
@@ -423,6 +424,7 @@ impl TestContext {
             SwapType::ExactOut,
             SwapConfig {
                 slippage_tolerance_bps: None,
+                sqrt_price_limit: None,
                 signer: Some(self.ctx.signer.pubkey()),
                 whirlpool_deployment: Some(self.whirlpool_deployment),
             },
@@ -476,6 +478,7 @@ impl TestContext {
             SwapType::ExactIn,
             SwapConfig {
                 slippage_tolerance_bps: None,
+                sqrt_price_limit: None,
                 signer: Some(self.ctx.signer.pubkey()),
                 whirlpool_deployment: Some(self.whirlpool_deployment),
             },
@@ -526,6 +529,7 @@ impl TestContext {
             SwapType::ExactOut,
             SwapConfig {
                 slippage_tolerance_bps: None,
+                sqrt_price_limit: None,
                 signer: Some(self.ctx.signer.pubkey()),
                 whirlpool_deployment: Some(self.whirlpool_deployment),
             },

@@ -1115,6 +1115,7 @@ mod tests {
             SwapType::ExactIn,
             SwapConfig {
                 slippage_tolerance_bps: Some(100),
+                sqrt_price_limit: None,
                 signer: Some(ctx.signer.pubkey()),
                 whirlpool_deployment: Some(whirlpool_deployment),
             },

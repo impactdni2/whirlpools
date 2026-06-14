@@ -11,7 +11,8 @@ use orca_whirlpools_client::{
 };
 use orca_whirlpools_core::{
     get_tick_array_start_tick_index, swap_quote_by_input_token, swap_quote_by_output_token,
-    ExactInSwapQuote, ExactOutSwapQuote, TickArrayFacade, TickFacade, TICK_ARRAY_SIZE,
+    ExactInSwapQuote, ExactOutSwapQuote, TickArrayFacade, TickArraySequence, TickArrays,
+    TickFacade, TICK_ARRAY_SIZE,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_instruction::{AccountMeta, Instruction};
@@ -138,6 +139,8 @@ async fn fetch_oracle(
 pub struct SwapConfig {
     /// An optional slippage tolerance, in basis points (BPS). Defaults to the global setting if not provided.
     pub slippage_tolerance_bps: Option<u16>,
+    /// An optional price limit for the swap represented as a square root. Defaults to no limit if not provided.
+    pub sqrt_price_limit: Option<u128>,
     /// An optional public key of the wallet or account executing the swap. Defaults to the global funder if not provided.
     pub signer: Option<Pubkey>,
     /// The Whirlpool program and config account to target.
@@ -192,6 +195,7 @@ pub struct SwapConfig {
 ///
 ///     let config = SwapConfig {
 ///         slippage_tolerance_bps: Some(100),
+///         sqrt_price_limit: None,
 ///         signer: Some(wallet.pubkey()),
 ///         whirlpool_deployment: Some(WhirlpoolDeployment::devnet()),
 ///     };
@@ -218,6 +222,7 @@ pub async fn swap_instructions(
 ) -> Result<SwapInstructions, Box<dyn Error>> {
     let SwapConfig {
         slippage_tolerance_bps,
+        sqrt_price_limit,
         signer,
         whirlpool_deployment,
     } = config;
@@ -273,21 +278,29 @@ pub async fn swap_instructions(
         .unwrap_or(0);
 
     let quote = match swap_type {
-        SwapType::ExactIn => SwapQuote::ExactIn(swap_quote_by_input_token(
-            amount,
-            specified_token_a,
-            slippage_tolerance_bps,
-            whirlpool.clone().into(),
-            oracle.map(|oracle| oracle.into()),
-            tick_arrays.map(|x| x.1).into(),
-            timestamp,
-            transfer_fee_a,
-            transfer_fee_b,
-        )?),
+        SwapType::ExactIn => {
+            let whirlpool_facade = whirlpool.clone().into();
+            let tick_arrays_for_quote: TickArrays = tick_arrays.map(|x| x.1).into();
+            let tick_sequence =
+                TickArraySequence::new(tick_arrays_for_quote.into(), whirlpool.tick_spacing)?;
+            SwapQuote::ExactIn(swap_quote_by_input_token(
+                amount,
+                specified_token_a,
+                slippage_tolerance_bps,
+                sqrt_price_limit,
+                &whirlpool_facade,
+                oracle.map(|oracle| oracle.into()),
+                &tick_sequence,
+                timestamp,
+                transfer_fee_a,
+                transfer_fee_b,
+            )?)
+        }
         SwapType::ExactOut => SwapQuote::ExactOut(swap_quote_by_output_token(
             amount,
             specified_token_a,
             slippage_tolerance_bps,
+            sqrt_price_limit,
             whirlpool.clone().into(),
             oracle.map(|oracle| oracle.into()),
             tick_arrays.map(|x| x.1).into(),
@@ -354,7 +367,7 @@ pub async fn swap_instructions(
         SwapV2InstructionArgs {
             amount,
             other_amount_threshold,
-            sqrt_price_limit: 0,
+            sqrt_price_limit: sqrt_price_limit.unwrap_or(0),
             amount_specified_is_input: specified_input,
             a_to_b,
             remaining_accounts_info: Some(RemainingAccountsInfo {
@@ -821,6 +834,7 @@ mod tests {
             swap_type.clone(),
             SwapConfig {
                 slippage_tolerance_bps: Some(100),
+                sqrt_price_limit: None,
                 signer: Some(ctx.signer.pubkey()),
                 whirlpool_deployment: Some(whirlpool_deployment),
             },
